@@ -1,2 +1,2 @@
-from .fields import VectorField
-from .managers import VectorManager
+from mariax.django_integration.fields import VectorField
+from mariax.django_integration.managers import VectorQuerySet

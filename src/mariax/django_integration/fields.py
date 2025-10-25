@@ -1,6 +1,6 @@
 from django.db import models
 
-from ..vector import to_db_text, validate_vector
+from mariax.vector import to_db_text, validate_vector
 
 
 class VectorField(models.Field):
@@ -21,11 +21,11 @@ class VectorField(models.Field):
         return name, path, args, kwargs
 
     def from_db_value(self, value, expression, connection):
-        # leave raw value (driver dependent); user can call mariax.vector.from_db_value
+        # leaving raw value (driver dependent); user can call mariax.vector.from_db_value
         return value
 
     def get_prep_value(self, value):
-        if value is None:
+        if not value:
             return None
         vec = validate_vector(value, self.dim)
         return to_db_text(vec)

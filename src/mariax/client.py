@@ -11,15 +11,17 @@ class DBClient:
     def __init__(self, connection):
         self.conn = connection
 
-    def execute(self, sql: str, params: Optional[Iterable[Any]] = None) -> int:
-        with contextlib.closing(self.conn.cursor()) as cur:
-            cur.execute(sql, params or ())
+    def _safe_commit(self):
         try:
             self.conn.commit()
         except Exception:
-            # some drivers auto-commit for DDL
-            pass
-        return cur.rowcount
+            pass  # Some MariaDB drivers auto-commit for DDL
+
+    def execute(self, sql: str, params: Optional[Iterable[Any]] = None) -> int:
+        with contextlib.closing(self.conn.cursor()) as cur:
+            cur.execute(sql, params or ())
+            self._safe_commit()
+            return cur.rowcount
 
     def fetchall(self, sql: str, params: Optional[Iterable[Any]] = None) -> List[Tuple]:
         with contextlib.closing(self.conn.cursor()) as cur:

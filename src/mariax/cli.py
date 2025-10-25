@@ -1,18 +1,24 @@
 import argparse
-import os
-from .client import DBClient
-from .ddl import create_vector_index_sql, drop_vector_index_sql
+from os import getenv
 
-# CLI using mysql-connector for convenience
 import mysql.connector as _mysql
+from django.db import connections
+from mariax.client import DBClient
+from mariax.ddl import create_vector_index_sql, drop_vector_index_sql
 
 
-def get_conn_from_env():
-    host = os.getenv("MARIADB_HOST", "127.0.0.1")
-    user = os.getenv("MARIADB_USER", "test")
-    password = os.getenv("MARIADB_PASSWORD", "test")
-    db = os.getenv("MARIADB_DB", "test")
-    return _mysql.connect(host=host, user=user, password=password, database=db)
+def get_connection(sync_dj_con=True, using="default"):
+    """
+    Retrieves and returns a database connection. Allows the option to retrieve a direct MySQL
+    connection or a Django-managed database connection.
+    """
+    if not sync_dj_con:
+        host = getenv("MARIADB_HOST", "localhost")
+        user = getenv("MARIADB_USER", "maria")
+        password = getenv("MARIADB_PASSWORD", "maria")
+        db = getenv("MARIADB_DB", "maria")
+        return _mysql.connect(host=host, user=user, password=password, database=db)
+    return connections[using]
 
 
 def main(argv=None):
@@ -31,7 +37,7 @@ def main(argv=None):
     drop.add_argument("--name", required=True)
 
     args = parser.parse_args(argv)
-    conn = get_conn_from_env()
+    conn = get_connection()
     db = DBClient(conn)
     if args.cmd == "create-index":
         fields = [f.strip() for f in args.fields.split(",")]
