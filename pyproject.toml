@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mariax"
-version = "1.1.1"
+version = "1.0.2"
 description = "Django ORM & Python library for MariaDB Vector support"
 authors = ["Apurv Chaudhary <apurv.sirohi@gmail.com>"]
 readme = "README.md"

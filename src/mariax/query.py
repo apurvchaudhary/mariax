@@ -1,7 +1,17 @@
-from typing import Iterable, Tuple
+from typing import Any, Iterable, Tuple
 
 from mariax.client import DBClient
 from mariax.vector import to_db_text
+
+
+def _metric_to_func(metric: str) -> str:
+    """Map a user metric string to the corresponding MariaDB function name."""
+    m = (metric or "cosine").strip().lower()
+    if m == "cosine":
+        return "VEC_DISTANCE_COSINE"
+    if m in ("euclidean", "l2"):
+        return "VEC_DISTANCE_EUCLIDEAN"
+    return "VEC_DISTANCE"
 
 
 def similarity_search(
@@ -12,7 +22,7 @@ def similarity_search(
     top_k: int = 10,
     metric: str = "cosine",
     where_sql: str = "",
-    where_params: Tuple = (),
+    where_params: Tuple[Any, ...] = (),
 ):
     """
     Perform a similarity search on a database table containing vector embeddings.
@@ -21,13 +31,7 @@ def similarity_search(
     The results are ordered by similarity and limited to the specified number
     of top results.
     """
-    metric = metric.lower()
-    if metric == "cosine":
-        func = "VEC_DISTANCE_COSINE"
-    elif metric in ("euclidean", "l2"):
-        func = "VEC_DISTANCE_EUCLIDEAN"
-    else:
-        func = "VEC_DISTANCE"
+    func = _metric_to_func(metric)
     vec_text = to_db_text(vector)
     sql = f"""
         SELECT *,
@@ -56,14 +60,7 @@ def nearest_neighbors(
     The query supports multiple distance metrics including cosine, Euclidean, or
     default unspecified metric. Results are sorted in ascending order of distance.
     """
-    metric = metric.lower()
-    if metric == "cosine":
-        func = "VEC_DISTANCE_COSINE"
-    elif metric in ("euclidean", "l2"):
-        func = "VEC_DISTANCE_EUCLIDEAN"
-    else:
-        func = "VEC_DISTANCE"
-
+    func = _metric_to_func(metric)
     vec_text = to_db_text(vector)
 
     sql = f"""

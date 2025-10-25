@@ -1,24 +1,42 @@
 import argparse
 from os import getenv
 
-import mysql.connector as _mysql
-from django.db import connections
 from mariax.client import DBClient
 from mariax.ddl import create_vector_index_sql, drop_vector_index_sql
 
 
-def get_connection(sync_dj_con=True, using="default"):
+def get_connection(sync_dj_con: bool = True, using: str = "default"):
+    """Return a database connection.
+
+    - If sync_dj_con is True, attempts to use a Django-managed connection.
+    - Otherwise, falls back to a direct mysql-connector connection using
+      environment variables.
+
+    This function lazily imports Django and mysql-connector to keep the CLI
+    usable even when these optional dependencies are not installed.
     """
-    Retrieves and returns a database connection. Allows the option to retrieve a direct MySQL
-    connection or a Django-managed database connection.
-    """
-    if not sync_dj_con:
-        host = getenv("MARIADB_HOST", "localhost")
-        user = getenv("MARIADB_USER", "maria")
-        password = getenv("MARIADB_PASSWORD", "maria")
-        db = getenv("MARIADB_DB", "maria")
-        return _mysql.connect(host=host, user=user, password=password, database=db)
-    return connections[using]
+    if sync_dj_con:
+        try:
+            from django.db import connections  # type: ignore
+        except Exception as e:  # ImportError or ImproperlyConfigured
+            raise RuntimeError(
+                "Django connection requested but Django is not available or not configured"
+            ) from e
+        return connections[using]
+
+    # Non-Django direct connection path
+    try:
+        import mysql.connector as _mysql  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "mysql-connector-python is required for direct connections. Install it or enable Django mode."
+        ) from e
+
+    host = getenv("MARIADB_HOST", "localhost")
+    user = getenv("MARIADB_USER", "maria")
+    password = getenv("MARIADB_PASSWORD", "maria")
+    db = getenv("MARIADB_DB", "maria")
+    return _mysql.connect(host=host, user=user, password=password, database=db)
 
 
 def main(argv=None):
@@ -37,10 +55,16 @@ def main(argv=None):
     drop.add_argument("--name", required=True)
 
     args = parser.parse_args(argv)
-    conn = get_connection()
+
+    # Prefer Django connection if Django is installed/configured; otherwise fallback.
+    try:
+        conn = get_connection(sync_dj_con=True)
+    except Exception:
+        conn = get_connection(sync_dj_con=False)
+
     db = DBClient(conn)
     if args.cmd == "create-index":
-        fields = [f.strip() for f in args.fields.split(",")]
+        fields = [f.strip() for f in args.fields.split(",") if f.strip()]
         sql = create_vector_index_sql(args.table, args.name, fields, distance=args.distance, m=args.m)
         print("Executing:", sql)
         db.execute(sql)

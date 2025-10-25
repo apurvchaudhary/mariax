@@ -1,9 +1,15 @@
 from django.db import models
 
-from mariax.vector import to_db_text, validate_vector
+from mariax.vector import validate_vector, to_db_text
 
 
 class VectorField(models.Field):
+    """
+    Django Field representing MariaDB VECTOR(dim).
+    Stores vectors as MariaDB VECTOR type. On save, values are validated and
+    serialized to JSON text, which the placeholder converts via VEC_FromText(%s).
+    """
+
     description = "MariaDB VECTOR field"
 
     def __init__(self, dim: int, *args, **kwargs):
@@ -21,11 +27,18 @@ class VectorField(models.Field):
         return name, path, args, kwargs
 
     def from_db_value(self, value, expression, connection):
-        # leaving raw value (driver dependent); user can call mariax.vector.from_db_value
+        # Keep raw value (driver dependent); callers may decode via mariax.vector.from_db_value
         return value
 
     def get_prep_value(self, value):
-        if not value:
+        if value in (None, ""):
             return None
         vec = validate_vector(value, self.dim)
+        # Return JSON text and rely on get_placeholder to wrap with VEC_FromText(%s)
         return to_db_text(vec)
+
+    def get_placeholder(self, value, compiler, connection):
+        # Django ORM calls this internally when rendering SQL for INSERT/UPDATE.
+        # Returning VEC_FromText(%s) ensures our JSON text param is converted to
+        # a native MariaDB VECTOR on the server side.
+        return "VEC_FromText(%s)"
