@@ -1,16 +1,24 @@
-[project]
+[tool.poetry]
 name = "mariax"
 version = "1.0.0"
-description = "MariaDB extended helpers: Vector columns, vector indexes, similarity queries, and framework integrations."
-authors = [{name="Apurv Chaudhary", email="apurv.sirohi@gmail.com"}]
+description = "Django ORM & Python library for MariaDB Vector support"
+authors = ["Apurv Chaudhary <apurv.sirohi@gmail.com>"]
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-"typing-extensions>=4.0",
-"mysqlclient>=2.2.0"
-]
+packages = [{ include = "mariax", from = "src" }]
 
+[tool.poetry.dependencies]
+python = "^3.12"
+django = ">=4.2"
+mysqlclient = ">=2.2.1"
+mysql-connector-python = "*"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.0"
+isort = "^6.0"
+
+[tool.poetry.extras]
+django = ["django"]
 
 [build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.6.0"]
+build-backend = "poetry.core.masonry.api"
