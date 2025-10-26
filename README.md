@@ -43,7 +43,7 @@
 
 ### Installation
 ```bash
-pip install mariax==1.0.0
+pip install mariax
 ```
 
 ### Example DDL

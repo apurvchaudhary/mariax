@@ -67,7 +67,7 @@ def nearest_neighbors(
         SELECT *,
                {func}({embedding_field}, VEC_FromText(%s)) AS neighbor_distance
         FROM {table}
-        ORDER BY neighbor_distance ASC
+        ORDER BY neighbor_distance
         LIMIT %s;
     """
     params = (vec_text, top_k)

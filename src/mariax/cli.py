@@ -1,27 +1,39 @@
 import argparse
 from os import getenv
 
+from django.core.exceptions import ImproperlyConfigured
+from django.db.utils import OperationalError, ProgrammingError
+
 from mariax.client import DBClient
 from mariax.ddl import create_vector_index_sql, drop_vector_index_sql
 
 
 def get_connection(sync_dj_con: bool = True, using: str = "default"):
-    """Return a database connection.
+    """
+    Gets a database connection, either using Django's ORM or a direct connection
+    to a MariaDB database. This function dynamically determines the connection
+    method depending on the `sync_dj_con` parameter.
 
-    - If sync_dj_con is True, attempts to use a Django-managed connection.
-    - Otherwise, falls back to a direct mysql-connector connection using
-      environment variables.
+    - If `sync_dj_con` is enabled, it attempts to fetch the database connection
+      from Django using the given alias defined in the `using` parameter.
+    - Otherwise, it establishes a direct connection to a MariaDB instance using
+      environment variables for the connection configuration.
 
-    This function lazily imports Django and mysql-connector to keep the CLI
-    usable even when these optional dependencies are not installed.
+    :param sync_dj_con: Determines whether to synchronize the connection using
+        Django's ORM (True) or establish a direct database connection (False).
+    :param using: The alias of the database connection in Django's configuration
+        when `sync_dj_con` is True. Defaults to "default".
+    :return: A database connection object obtained either from Django's ORM
+        or a direct connection to MariaDB.
+    :raises RuntimeError: If Django is requested but not available or improperly
+        configured, or if `mysql-connector-python` is not installed for a direct
+        connection.
     """
     if sync_dj_con:
         try:
             from django.db import connections  # type: ignore
         except Exception as e:  # ImportError or ImproperlyConfigured
-            raise RuntimeError(
-                "Django connection requested but Django is not available or not configured"
-            ) from e
+            raise RuntimeError("Django connection requested but Django is not available or not configured") from e
         return connections[using]
 
     # Non-Django direct connection path
@@ -40,6 +52,19 @@ def get_connection(sync_dj_con: bool = True, using: str = "default"):
 
 
 def main(argv=None):
+    """
+    The main entry point for the script that offers two subcommands: `create-index` and
+    `drop-index` for managing vector-based indices in a database table. This function
+    handles command-line arguments, establishes a database connection, and executes
+    the respective SQL operations based on the provided command.
+
+    :param argv: List of command-line arguments passed to the script. If None, it defaults
+        to the system arguments. Should include the commands (`create-index` or
+        `drop-index`) with their respective options.
+    :type argv: List[str] or None
+
+    :return: None/raise
+    """
     parser = argparse.ArgumentParser(prog="mariax")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -59,7 +84,7 @@ def main(argv=None):
     # Prefer Django connection if Django is installed/configured; otherwise fallback.
     try:
         conn = get_connection(sync_dj_con=True)
-    except Exception:
+    except (ModuleNotFoundError, ImproperlyConfigured, OperationalError, ProgrammingError):
         conn = get_connection(sync_dj_con=False)
 
     db = DBClient(conn)
@@ -72,3 +97,5 @@ def main(argv=None):
         sql = drop_vector_index_sql(args.table, args.name)
         print("Executing:", sql)
         db.execute(sql)
+    else:
+        raise ValueError(f"Unknown command: {args.cmd}")

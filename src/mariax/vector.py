@@ -1,4 +1,5 @@
-"""Utility helpers for working with MariaDB VECTOR values.
+"""
+Utility helpers for working with MariaDB VECTOR values.
 
 Public API:
 - validate_vector: ensure an iterable of numbers with optional fixed dimension
@@ -17,10 +18,22 @@ __all__ = [
 
 
 def validate_vector(vec: Iterable[float], dim: Optional[int] = None) -> List[float]:
-    """Validate and normalize a vector-like input to a list of floats.
+    """
+    Validates if the input vector is an iterable of numbers and optionally checks its dimension.
 
-    - vec: any iterable with numeric items
-    - dim: if provided, enforces exact length
+    This function ensures that the input vector is not None and is an iterable containing numbers.
+    If a dimension is specified, it checks if the length of the vector matches the given dimension.
+
+    :param vec: The input vector to be validated. Must be an iterable of numbers.
+    :type vec: Iterable[float]
+    :param dim: The expected dimension of the vector. If provided, the function checks
+                whether the length of the input vector matches this value.
+    :type dim: Optional[int]
+    :return: A list of float values representing a validated vector. The function converts
+             the elements of the input iterable to floats.
+    :rtype: List[float]
+    :raises ValueError: If the input vector is None, contains non-numeric elements, or does
+                        not match the specified dimension when `dim` is provided.
     """
     if vec is None:
         raise ValueError("vector must not be None")
@@ -34,7 +47,15 @@ def validate_vector(vec: Iterable[float], dim: Optional[int] = None) -> List[flo
 
 
 def to_db_text(vec: Iterable[float], dim: Optional[int] = None) -> str:
-    """Serialize a vector to JSON text suitable for VEC_FromText(%s)."""
+    """
+    Converts a vector into a JSON string representation. This function validates the input
+    vector against the optional dimension if provided before converting the validated vector
+    to a compact JSON string format without unnecessary spaces.
+
+    :param vec: The vector to be validated and converted. Must be an iterable of floats.
+    :param dim: Optional. If provided, specifies the expected dimension of the vector.
+    :return: A JSON string representing the validated vector.
+    """
     arr = validate_vector(vec, dim)
     return json.dumps(arr, separators=(",", ":"))
 
@@ -43,14 +64,16 @@ DbScalar = Union[str, bytes, float, int]
 
 
 def from_db_value(value: Union[DbScalar, Sequence[float], None]) -> Optional[List[float]]:
-    """Convert various database-returned representations into list[float].
+    """
+    Converts a database value into a list of floats. Handles different input types including
+    None, list, tuple, bytes, string, and scalar numeric values. For string-based inputs,
+    it attempts to parse JSON if the string appears to be JSON-encoded. If parsing fails,
+    it additionally tolerates bracketed or plain comma-separated forms.
 
-    Accepts:
-    - None -> None
-    - list/tuple of numbers -> list[float]
-    - JSON text or bytes (e.g., "[0.1, 0.2]") -> list[float]
-    - Fallback: comma-separated text without brackets -> list[float]
-    - Scalar number -> [float(value)]
+    :param value: The input value to be converted. Can be of the type `DbScalar`,
+                  a sequence of `float`, or `None`.
+    :return: A list of float values parsed from the input or `None` if the input
+             is `None`.
     """
     if value is None:
         return None
