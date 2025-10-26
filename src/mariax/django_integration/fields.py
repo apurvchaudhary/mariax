@@ -1,6 +1,9 @@
+from ast import literal_eval
+
+import numpy as np
 from django.db import models
 
-from mariax.vector import validate_vector, to_db_text
+from mariax.vector import validate_vector, to_db_text, from_db_value as vec_from_db_value
 
 
 class VectorField(models.Field):
@@ -26,18 +29,35 @@ class VectorField(models.Field):
         kwargs["dim"] = self.dim
         return name, path, args, kwargs
 
-    def from_db_value(self, value, expression, connection):
-        # Keep raw value (driver dependent); callers may decode via mariax.vector.from_db_value
-        return value
+    @staticmethod
+    def from_db_value(value, *args, **kwargs):
+        if value in (None, ""):
+            return None
+        # If it’s bytes or MariaDB returns a memoryview
+        if isinstance(value, (bytes, memoryview, bytearray)):
+            # Convert raw binary VECTOR → float32 array → list
+            return np.frombuffer(bytes(value), dtype=np.float32).tolist()
+        # If stored as JSON/text
+        return vec_from_db_value(value)
 
     def get_prep_value(self, value):
         if value in (None, ""):
             return None
+        if isinstance(value, str):
+            try:
+                value = literal_eval(value)
+            except (ValueError, SyntaxError):
+                pass
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            arr = np.frombuffer(value, dtype=np.float32)
+            value = arr.tolist()
+        # Validate dimension and types, then serialize
         vec = validate_vector(value, self.dim)
         # Return JSON text and rely on get_placeholder to wrap with VEC_FromText(%s)
         return to_db_text(vec)
 
-    def get_placeholder(self, value, compiler, connection):
+    @staticmethod
+    def get_placeholder(*args, **kwargs):
         # Django ORM calls this internally when rendering SQL for INSERT/UPDATE.
         # Returning VEC_FromText(%s) ensures our JSON text param is converted to
         # a native MariaDB VECTOR on the server side.
